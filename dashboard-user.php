@@ -61,9 +61,17 @@ body.custom-font-size h6 {
     border-radius: 10px;
     padding: 15px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    z-index: 1000;
+    border: 3px solid #DE28A6; /* Add prominent border to make it more visible in WebView */
+    z-index: 10000; /* Increased z-index to ensure visibility in WebView */
     width: 260px;
     display: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease;
+    transform: translateZ(0); /* Force hardware acceleration */
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden; /* Prevent flickering */
+    -webkit-backface-visibility: hidden; /* Prevent flickering on WebView */
 }
 
 #font-size-settings h4 {
@@ -195,7 +203,7 @@ body.custom-font-size h6 {
             <button id="center-location-btn" style="position:fixed; bottom:80px; right:20px; z-index:3; background:#DE28A6; color:#fff; border:none; border-radius:50%; width:50px; height:50px; font-size:20px; box-shadow:0 2px 8px rgba(0,0,0,0.15); cursor:pointer; display:flex; align-items:center; justify-content:center;">
                 <i id="center-icon" class="fa fa-location-crosshairs"></i>
             </button>
-            <button id="settings-btn" style="position:fixed; bottom:140px; right:20px; z-index:3; background:#DE28A6; color:#fff; border:none; border-radius:50%; width:50px; height:50px; font-size:20px; box-shadow:0 2px 8px rgba(0,0,0,0.15); cursor:pointer; display:flex; align-items:center; justify-content:center;">
+            <button id="settings-btn" onclick="toggleFontSettingsPanel()" style="position:fixed; bottom:140px; right:20px; z-index:3; background:#DE28A6; color:#fff; border:none; border-radius:50%; width:50px; height:50px; font-size:20px; box-shadow:0 2px 8px rgba(0,0,0,0.15); cursor:pointer; display:flex; align-items:center; justify-content:center;">
                 <i class="fa fa-gear"></i>
             </button>
             
@@ -486,14 +494,7 @@ function initFontSizeSettings() {
     
     // Toggle font settings panel
     document.getElementById('settings-btn').addEventListener('click', function() {
-        const panel = document.getElementById('font-size-settings');
-        if (panel.style.display === 'block') {
-            panel.style.display = 'none';
-            isFontSettingsOpen = false;
-        } else {
-            panel.style.display = 'block';
-            isFontSettingsOpen = true;
-        }
+        toggleFontSettingsPanel();
     });
     
     // Update base font size display
@@ -512,8 +513,7 @@ function initFontSizeSettings() {
     document.getElementById('save-font-settings').addEventListener('click', function() {
         saveFontSettings();
         applyFontSettings();
-        document.getElementById('font-size-settings').style.display = 'none';
-        isFontSettingsOpen = false;
+        toggleFontSettingsPanel(false);
         
         Swal.fire({
             title: 'Success!',
@@ -578,6 +578,28 @@ function applyFontSettings() {
     document.body.classList.add('custom-font-size');
 }
 
+// Function to toggle font settings panel
+function toggleFontSettingsPanel(forceState) {
+    const panel = document.getElementById('font-size-settings');
+    
+    if (forceState === false || (forceState === undefined && isFontSettingsOpen)) {
+        // Hide panel
+        panel.style.opacity = '0';
+        panel.style.visibility = 'hidden';
+        panel.style.display = 'none';
+        isFontSettingsOpen = false;
+    } else {
+        // Show panel
+        panel.style.display = 'block';
+        // Small delay to ensure display change takes effect before other properties
+        setTimeout(function() {
+            panel.style.opacity = '1';
+            panel.style.visibility = 'visible';
+        }, 10);
+        isFontSettingsOpen = true;
+    }
+}
+
 // Close settings panel when clicking elsewhere
 document.addEventListener('click', function(event) {
     const settingsPanel = document.getElementById('font-size-settings');
@@ -587,8 +609,7 @@ document.addEventListener('click', function(event) {
         !settingsPanel.contains(event.target) && 
         event.target !== settingsButton && 
         !settingsButton.contains(event.target)) {
-        settingsPanel.style.display = 'none';
-        isFontSettingsOpen = false;
+        toggleFontSettingsPanel(false);
     }
 });
 
