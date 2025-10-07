@@ -52,48 +52,92 @@ body.custom-font-size h6 {
     position: absolute !important;
 }
 
-/* Font size settings panel */
-#font-size-settings {
+/* Font size settings modal - fullscreen approach */
+#font-size-modal {
     position: fixed;
-    right: 20px;
-    bottom: 140px;
-    background: #fff;
-    border-radius: 10px;
-    padding: 15px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    border: 3px solid #DE28A6; /* Add prominent border to make it more visible in WebView */
-    z-index: 10000; /* Increased z-index to ensure visibility in WebView */
-    width: 260px;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 2000000; /* extremely high to ensure visibility */
     display: none;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.2s ease;
-    transform: translateZ(0); /* Force hardware acceleration */
-    -webkit-transform: translateZ(0);
-    backface-visibility: hidden; /* Prevent flickering */
-    -webkit-backface-visibility: hidden; /* Prevent flickering on WebView */
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
 }
 
-#font-size-settings h4 {
-    font-size: 16px;
-    margin-bottom: 10px;
-    color: #333;
+#font-size-modal-content {
+    background-color: #fff;
+    width: 90%;
+    max-width: 500px;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    position: relative;
 }
 
-#font-size-settings .font-control {
+#font-size-modal-close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 24px;
+    color: #999;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+#font-size-modal h3 {
+    color: #DE28A6;
+    font-size: 18px;
+    margin-bottom: 20px;
+    text-align: center;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.font-control {
     display: flex;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 20px;
 }
 
-#font-size-settings label {
+.font-control label {
     flex: 1;
     margin-right: 10px;
-    color: #555;
+    color: #333;
+    font-weight: bold;
 }
 
-#font-size-settings input[type="range"] {
+.font-control .size-value {
+    width: 45px;
+    text-align: center;
+    font-weight: bold;
+    color: #DE28A6;
+}
+
+.font-control input[type="range"] {
     flex: 1.5;
+    height: 10px;
+}
+
+#save-font-settings {
+    background: #DE28A6;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 12px 20px;
+    width: 100%;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.2s ease;
+}
+
+#save-font-settings:hover {
+    background: #b91e88;
 }
 
 #info-panel {
@@ -203,24 +247,27 @@ body.custom-font-size h6 {
             <button id="center-location-btn" style="position:fixed; bottom:80px; right:20px; z-index:3; background:#DE28A6; color:#fff; border:none; border-radius:50%; width:50px; height:50px; font-size:20px; box-shadow:0 2px 8px rgba(0,0,0,0.15); cursor:pointer; display:flex; align-items:center; justify-content:center;">
                 <i id="center-icon" class="fa fa-location-crosshairs"></i>
             </button>
-            <button id="settings-btn" onclick="toggleFontSettingsPanel()" style="position:fixed; bottom:140px; right:20px; z-index:3; background:#DE28A6; color:#fff; border:none; border-radius:50%; width:50px; height:50px; font-size:20px; box-shadow:0 2px 8px rgba(0,0,0,0.15); cursor:pointer; display:flex; align-items:center; justify-content:center;">
+            <button id="settings-btn" onclick="openFontSizeModal()" style="position:fixed; bottom:140px; right:20px; z-index:3; background:#DE28A6; color:#fff; border:none; border-radius:50%; width:50px; height:50px; font-size:20px; box-shadow:0 2px 8px rgba(0,0,0,0.15); cursor:pointer; display:flex; align-items:center; justify-content:center;">
                 <i class="fa fa-gear"></i>
             </button>
             
-            <!-- Font size settings panel -->
-            <div id="font-size-settings">
-                <h4><i class="fa fa-text-height"></i> Font Size Settings</h4>
-                <div class="font-control">
-                    <label for="base-font-size">Base Font Size:</label>
-                    <input type="range" id="base-font-size" min="12" max="24" step="1" value="16">
-                    <span id="base-font-value">16px</span>
+            <!-- Font size settings modal - full screen approach -->
+            <div id="font-size-modal">
+                <div id="font-size-modal-content">
+                    <button id="font-size-modal-close">&times;</button>
+                    <h3><i class="fa fa-text-height"></i> Font Size Settings</h3>
+                    <div class="font-control">
+                        <label for="base-font-size">Base Font Size:</label>
+                        <input type="range" id="base-font-size" min="12" max="24" step="1" value="16">
+                        <span id="base-font-value" class="size-value">16px</span>
+                    </div>
+                    <div class="font-control">
+                        <label for="heading-font-size">Heading Size:</label>
+                        <input type="range" id="heading-font-size" min="14" max="28" step="1" value="18">
+                        <span id="heading-font-value" class="size-value">18px</span>
+                    </div>
+                    <button id="save-font-settings">Save Settings</button>
                 </div>
-                <div class="font-control">
-                    <label for="heading-font-size">Heading Size:</label>
-                    <input type="range" id="heading-font-size" min="14" max="28" step="1" value="18">
-                    <span id="heading-font-value">18px</span>
-                </div>
-                <button id="save-font-settings" style="background:#DE28A6; color:#fff; border:none; border-radius:5px; padding:6px 12px; width:100%; font-weight:bold; cursor:pointer;">Save Settings</button>
             </div>
             <div class="content-page" style="margin:0; padding:0;">
                 <div class="content" style="margin:0; padding:0;">
@@ -492,9 +539,21 @@ function initFontSizeSettings() {
     // Load saved font settings if available
     loadFontSettings();
     
-    // Toggle font settings panel
+    // Open font settings modal
     document.getElementById('settings-btn').addEventListener('click', function() {
-        toggleFontSettingsPanel();
+        openFontSizeModal();
+    });
+    
+    // Close modal with X button
+    document.getElementById('font-size-modal-close').addEventListener('click', function() {
+        closeFontSizeModal();
+    });
+    
+    // Close modal when clicking outside the content
+    document.getElementById('font-size-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeFontSizeModal();
+        }
     });
     
     // Update base font size display
@@ -513,7 +572,7 @@ function initFontSizeSettings() {
     document.getElementById('save-font-settings').addEventListener('click', function() {
         saveFontSettings();
         applyFontSettings();
-        toggleFontSettingsPanel(false);
+        closeFontSizeModal();
         
         Swal.fire({
             title: 'Success!',
@@ -523,6 +582,18 @@ function initFontSizeSettings() {
             showConfirmButton: false
         });
     });
+}
+
+// Open font size modal
+function openFontSizeModal() {
+    const modal = document.getElementById('font-size-modal');
+    modal.style.display = 'flex';
+}
+
+// Close font size modal
+function closeFontSizeModal() {
+    const modal = document.getElementById('font-size-modal');
+    modal.style.display = 'none';
 }
 
 // Update font size preview in real-time
@@ -577,41 +648,6 @@ function applyFontSettings() {
     // Add a class to the body to indicate custom fonts are applied
     document.body.classList.add('custom-font-size');
 }
-
-// Function to toggle font settings panel
-function toggleFontSettingsPanel(forceState) {
-    const panel = document.getElementById('font-size-settings');
-    
-    if (forceState === false || (forceState === undefined && isFontSettingsOpen)) {
-        // Hide panel
-        panel.style.opacity = '0';
-        panel.style.visibility = 'hidden';
-        panel.style.display = 'none';
-        isFontSettingsOpen = false;
-    } else {
-        // Show panel
-        panel.style.display = 'block';
-        // Small delay to ensure display change takes effect before other properties
-        setTimeout(function() {
-            panel.style.opacity = '1';
-            panel.style.visibility = 'visible';
-        }, 10);
-        isFontSettingsOpen = true;
-    }
-}
-
-// Close settings panel when clicking elsewhere
-document.addEventListener('click', function(event) {
-    const settingsPanel = document.getElementById('font-size-settings');
-    const settingsButton = document.getElementById('settings-btn');
-    
-    if (isFontSettingsOpen && 
-        !settingsPanel.contains(event.target) && 
-        event.target !== settingsButton && 
-        !settingsButton.contains(event.target)) {
-        toggleFontSettingsPanel(false);
-    }
-});
 
 // ✅ Function called by the MIT App (EvaluateJavaScript)
 function updateLocation(lat, lng) {
