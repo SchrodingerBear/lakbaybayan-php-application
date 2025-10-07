@@ -43,7 +43,13 @@ if (!isset($_SESSION['user'])) {
             <li class="side-nav-item">
             <a href="dashboard-user.php" class="side-nav-link">
                 <i class="uil-dashboard"></i>
-                <span> Book  </span>
+                <span> Home  </span>
+            </a>
+            </li>
+            <li class="side-nav-item">
+            <a href="profile.php" class="side-nav-link">
+                <i class="fa-solid fa-user"></i>
+                <span> Profile </span>
             </a>
             </li>
         <?php elseif ($userType === 1): ?> <!-- TERMINAL USER -->

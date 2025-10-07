@@ -12,6 +12,23 @@
     
  <head>
     <style>
+:root {
+    --base-font-size: 16px;
+    --heading-font-size: 18px;
+}
+
+body.custom-font-size {
+    font-size: var(--base-font-size);
+}
+
+body.custom-font-size h1, 
+body.custom-font-size h2, 
+body.custom-font-size h3, 
+body.custom-font-size h4, 
+body.custom-font-size h5, 
+body.custom-font-size h6 {
+    font-size: var(--heading-font-size);
+}
 
 .topbar, 
 .navbar-custom {
@@ -33,6 +50,42 @@
 .profile-dropdown .dropdown-menu {
     z-index: 200000 !important; /* way higher than Leaflet */
     position: absolute !important;
+}
+
+/* Font size settings panel */
+#font-size-settings {
+    position: fixed;
+    right: 20px;
+    bottom: 140px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    z-index: 1000;
+    width: 260px;
+    display: none;
+}
+
+#font-size-settings h4 {
+    font-size: 16px;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+#font-size-settings .font-control {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+#font-size-settings label {
+    flex: 1;
+    margin-right: 10px;
+    color: #555;
+}
+
+#font-size-settings input[type="range"] {
+    flex: 1.5;
 }
 
 #info-panel {
@@ -78,7 +131,7 @@
 }
 
 #info-panel h5 {
-  font-size: 18px;
+  font-size: var(--heading-font-size);
   font-weight: 600;
 }
 
@@ -94,17 +147,17 @@
   padding: 8px 12px;
   border-radius: 8px;
   text-align: center;
-  font-size: 14px;
+  font-size: calc(var(--base-font-size) - 2px);
 }
 
 #info-panel .info-card strong {
   display: block;
-  font-size: 12px;
+  font-size: calc(var(--base-font-size) - 4px);
   color: #f8dfff;
 }
 
 #info-panel .info-card span {
-  font-size: 15px;
+  font-size: calc(var(--base-font-size) - 1px);
   font-weight: bold;
   color: #fff;
 }
@@ -139,6 +192,28 @@
         <button id="nearby-btn" style="position:fixed; top:90px; left:50px; z-index:3; background:#DE28A6; color:#fff; border:none; border-radius:8px; padding:10px 18px; font-weight:bold; box-shadow:0 2px 8px rgba(0,0,0,0.15); cursor:pointer;">
                 <i class="fa fa-location-arrow"></i> Nearby Terminals
             </button>
+            <button id="center-location-btn" style="position:fixed; bottom:80px; right:20px; z-index:3; background:#DE28A6; color:#fff; border:none; border-radius:50%; width:50px; height:50px; font-size:20px; box-shadow:0 2px 8px rgba(0,0,0,0.15); cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                <i id="center-icon" class="fa fa-location-crosshairs"></i>
+            </button>
+            <button id="settings-btn" style="position:fixed; bottom:140px; right:20px; z-index:3; background:#DE28A6; color:#fff; border:none; border-radius:50%; width:50px; height:50px; font-size:20px; box-shadow:0 2px 8px rgba(0,0,0,0.15); cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                <i class="fa fa-gear"></i>
+            </button>
+            
+            <!-- Font size settings panel -->
+            <div id="font-size-settings">
+                <h4><i class="fa fa-text-height"></i> Font Size Settings</h4>
+                <div class="font-control">
+                    <label for="base-font-size">Base Font Size:</label>
+                    <input type="range" id="base-font-size" min="12" max="24" step="1" value="16">
+                    <span id="base-font-value">16px</span>
+                </div>
+                <div class="font-control">
+                    <label for="heading-font-size">Heading Size:</label>
+                    <input type="range" id="heading-font-size" min="14" max="28" step="1" value="18">
+                    <span id="heading-font-value">18px</span>
+                </div>
+                <button id="save-font-settings" style="background:#DE28A6; color:#fff; border:none; border-radius:5px; padding:6px 12px; width:100%; font-weight:bold; cursor:pointer;">Save Settings</button>
+            </div>
             <div class="content-page" style="margin:0; padding:0;">
                 <div class="content" style="margin:0; padding:0;">
                 <div class="container-fluid" style="margin:0; padding:0;">
@@ -271,6 +346,9 @@ var selectedTerminal = null;
 var selectedDestination = null;
 var destinationMarker = null;
 var routingControl = null;
+var isLocationLoading = true; // Track if location is being fetched
+var hasLocation = false; // Track if location has been successfully obtained
+var isFontSettingsOpen = false; // Track if font settings panel is open
 
 // Initialize map when DOM is ready
 document.addEventListener("DOMContentLoaded", function () {
@@ -289,6 +367,51 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     L.control.layers({ "OpenStreetMap": osm, "Satellite": satellite }).addTo(map);
+
+    // Center location button
+    document.getElementById('center-location-btn').addEventListener('click', function() {
+        if (!hasLocation) {
+            // If we don't have location yet, try to get it
+            Swal.fire({
+                title: 'Getting your location...',
+                text: 'Please wait while we locate you.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+            
+            if (navigator.geolocation) {
+                isLocationLoading = true;
+                document.getElementById('center-icon').className = 'fa fa-spinner fa-spin';
+                
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    updateLocation(lat, lng);
+                    map.setView([lat, lng], 16);
+                    
+                    Swal.close();
+                    isLocationLoading = false;
+                    hasLocation = true;
+                    document.getElementById('center-icon').className = 'fa fa-check';
+                }, 
+                function(error) {
+                    isLocationLoading = false;
+                    Swal.fire('Error', 'Unable to get your location. Please check your location settings.', 'error');
+                    document.getElementById('center-icon').className = 'fa fa-location-crosshairs';
+                });
+            } else {
+                Swal.fire('Error', 'Geolocation is not supported by your browser.', 'error');
+            }
+        } else {
+            // We already have location, just center the map
+            if (userMarker) {
+                map.setView(userMarker.getLatLng(), 16);
+            }
+        }
+    });
 
     // Nearby button
     document.getElementById('nearby-btn').addEventListener('click', function () {
@@ -351,6 +474,122 @@ document.addEventListener("DOMContentLoaded", function () {
     } else {
         console.warn("No geolocation support detected.");
     }
+    
+    // Font size settings handlers
+    initFontSizeSettings();
+});
+
+// Initialize font size settings
+function initFontSizeSettings() {
+    // Load saved font settings if available
+    loadFontSettings();
+    
+    // Toggle font settings panel
+    document.getElementById('settings-btn').addEventListener('click', function() {
+        const panel = document.getElementById('font-size-settings');
+        if (panel.style.display === 'block') {
+            panel.style.display = 'none';
+            isFontSettingsOpen = false;
+        } else {
+            panel.style.display = 'block';
+            isFontSettingsOpen = true;
+        }
+    });
+    
+    // Update base font size display
+    document.getElementById('base-font-size').addEventListener('input', function(e) {
+        document.getElementById('base-font-value').textContent = e.target.value + 'px';
+        updateFontSizePreview();
+    });
+    
+    // Update heading font size display
+    document.getElementById('heading-font-size').addEventListener('input', function(e) {
+        document.getElementById('heading-font-value').textContent = e.target.value + 'px';
+        updateFontSizePreview();
+    });
+    
+    // Save font settings
+    document.getElementById('save-font-settings').addEventListener('click', function() {
+        saveFontSettings();
+        applyFontSettings();
+        document.getElementById('font-size-settings').style.display = 'none';
+        isFontSettingsOpen = false;
+        
+        Swal.fire({
+            title: 'Success!',
+            text: 'Font size settings saved',
+            icon: 'success',
+            timer: 1500,
+            showConfirmButton: false
+        });
+    });
+}
+
+// Update font size preview in real-time
+function updateFontSizePreview() {
+    const baseSize = document.getElementById('base-font-size').value + 'px';
+    const headingSize = document.getElementById('heading-font-size').value + 'px';
+    
+    document.documentElement.style.setProperty('--base-font-size', baseSize);
+    document.documentElement.style.setProperty('--heading-font-size', headingSize);
+}
+
+// Save font settings to localStorage
+function saveFontSettings() {
+    const settings = {
+        baseSize: document.getElementById('base-font-size').value,
+        headingSize: document.getElementById('heading-font-size').value
+    };
+    
+    localStorage.setItem('fontSizeSettings', JSON.stringify(settings));
+}
+
+// Load font settings from localStorage
+function loadFontSettings() {
+    const savedSettings = localStorage.getItem('fontSizeSettings');
+    
+    if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        
+        document.getElementById('base-font-size').value = settings.baseSize;
+        document.getElementById('heading-font-size').value = settings.headingSize;
+        
+        document.getElementById('base-font-value').textContent = settings.baseSize + 'px';
+        document.getElementById('heading-font-value').textContent = settings.headingSize + 'px';
+        
+        // Apply saved settings
+        applyFontSettings();
+    } else {
+        // Add CSS variables with default values
+        document.documentElement.style.setProperty('--base-font-size', '16px');
+        document.documentElement.style.setProperty('--heading-font-size', '18px');
+    }
+}
+
+// Apply font settings to the page
+function applyFontSettings() {
+    const baseSize = document.getElementById('base-font-size').value + 'px';
+    const headingSize = document.getElementById('heading-font-size').value + 'px';
+    
+    document.documentElement.style.setProperty('--base-font-size', baseSize);
+    document.documentElement.style.setProperty('--heading-font-size', headingSize);
+    
+    // Add a class to the body to indicate custom fonts are applied
+    document.body.classList.add('custom-font-size');
+}
+
+// Close settings panel when clicking elsewhere
+document.addEventListener('click', function(event) {
+    const settingsPanel = document.getElementById('font-size-settings');
+    const settingsButton = document.getElementById('settings-btn');
+    
+    if (isFontSettingsOpen && 
+        !settingsPanel.contains(event.target) && 
+        event.target !== settingsButton && 
+        !settingsButton.contains(event.target)) {
+        settingsPanel.style.display = 'none';
+        isFontSettingsOpen = false;
+    }
 });
 
 // ✅ Function called by the MIT App (EvaluateJavaScript)
@@ -376,6 +615,18 @@ function updateLocation(lat, lng) {
             .openTooltip();
     } else {
         userMarker.setLatLng([lat, lng]);
+    }
+
+    // Update the center button icon when we get location
+    if (isLocationLoading) {
+        isLocationLoading = false;
+        hasLocation = true;
+        document.getElementById('center-icon').className = 'fa fa-check';
+        
+        // After 2 seconds, change to the normal icon
+        setTimeout(() => {
+            document.getElementById('center-icon').className = 'fa fa-location-crosshairs';
+        }, 2000);
     }
 
     if (firstUpdate) {
