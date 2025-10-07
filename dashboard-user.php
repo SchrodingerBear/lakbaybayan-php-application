@@ -261,39 +261,20 @@ function endDrag() {
                 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
                 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
                 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
 var userMarker = null;
 var firstUpdate = true;
-var userCircle = null; // Declare userCircle
+var userCircle = null;
+var map;
+var selectedTerminal = null;
+var selectedDestination = null;
+var destinationMarker = null;
+var routingControl = null;
 
-document.addEventListener("DOMContentLoaded", function() {
-    var map = L.map('map').setView([13, 122], 6); // Default center (Philippines)
-
-    // Nearby button
-    document.getElementById('nearby-btn').addEventListener('click', function() {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(function(position) {
-                var lat = position.coords.latitude;
-                var lng = position.coords.longitude;
-
-                map.setView([lat, lng], 15);
-
-                if (userCircle) {
-                    map.removeLayer(userCircle);
-                }
-                userCircle = L.circle([lat, lng], {
-                    color: 'red',
-                    fillColor: '#f03',
-                    fillOpacity: 0.2,
-                    radius: 1000
-                }).addTo(map);
-            }, function() {
-                Swal.fire('Error', 'Unable to get your location.', 'error');
-            });
-        } else {
-            Swal.fire('Error', 'Geolocation not supported.', 'error');
-        }
-    });
+// Initialize map when DOM is ready
+document.addEventListener("DOMContentLoaded", function () {
+    map = L.map('map').setView([13, 122], 6); // Default center (Philippines)
 
     // Base layers
     var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -301,16 +282,35 @@ document.addEventListener("DOMContentLoaded", function() {
         attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    var satellite = L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 19,
         attribution: '© Esri'
     });
 
-    var baseMaps = {
-        "OpenStreetMap": osm,
-        "Satellite": satellite
-    };
-    L.control.layers(baseMaps).addTo(map);
+    L.control.layers({ "OpenStreetMap": osm, "Satellite": satellite }).addTo(map);
+
+    // Nearby button
+    document.getElementById('nearby-btn').addEventListener('click', function () {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function (position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                map.setView([lat, lng], 15);
+
+                if (userCircle) map.removeLayer(userCircle);
+
+                userCircle = L.circle([lat, lng], {
+                    color: 'red',
+                    fillColor: '#f03',
+                    fillOpacity: 0.2,
+                    radius: 1000
+                }).addTo(map);
+            }, () => Swal.fire('Error', 'Unable to get your location.', 'error'));
+        } else {
+            Swal.fire('Error', 'Geolocation not supported.', 'error');
+        }
+    });
 
     // Tricycle icon
     var tricycleIcon = L.icon({
@@ -320,62 +320,21 @@ document.addEventListener("DOMContentLoaded", function() {
         popupAnchor: [0, -32]
     });
 
-    var selectedTerminal = null;
-    var selectedDestination = null;
-    var destinationMarker = null;
-    var routingControl = null;
-    // Fetch terminals from database
+    // Fetch terminals
     fetch("get-terminals.php")
-        .then(response => response.json())
+        .then(r => r.json())
         .then(result => {
-            // Fix: Some APIs wrap data inside another 'data' property
-            let terminals = Array.isArray(result.data) ? result.data
+            const terminals = Array.isArray(result.data)
+                ? result.data
                 : (result.data && Array.isArray(result.data.data) ? result.data.data : []);
 
             if (result.status === "success" && Array.isArray(terminals)) {
-                // Add terminal markers dynamically
-                terminals.forEach(function(terminal) {
-                    var lat = parseFloat(terminal.latitude);
-                    var lng = parseFloat(terminal.longitude);
-
-                    var marker = L.marker([lat, lng], {icon: tricycleIcon})
+                terminals.forEach(terminal => {
+                    const lat = parseFloat(terminal.latitude);
+                    const lng = parseFloat(terminal.longitude);
+                    const marker = L.marker([lat, lng], { icon: tricycleIcon })
                         .addTo(map)
-                        .on('click', function() {
-                            Swal.fire({
-                                title: terminal.name,
-                                html: `
-                                    <img src="${terminal.image}" alt="Terminal Image" style="max-width:300px;display:block;margin:10px auto;">
-                                    <button id="view-360-btn" style="background:#4285F4;color:#fff;border:none;border-radius:6px;padding:8px 16px;margin:10px auto;display:block;cursor:pointer;">
-                                        <i class="fa fa-street-view"></i> View 360
-                                    </button>
-                                `,
-                                text: "Do you want to select this terminal?",
-                                showCancelButton: true,
-                                confirmButtonText: 'Select',
-                                cancelButtonText: 'Cancel',
-                                icon: 'info',
-                                didOpen: () => {
-                                    document.getElementById('view-360-btn').onclick = function() {
-                                        const lat = terminal.latitude;
-                                        const lng = terminal.longitude;
-                                        const url = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
-                                        window.open(url, '_blank');
-                                    };
-                                }
-                            }).then((swalResult) => {
-                                if (swalResult.isConfirmed) {
-                                    selectedTerminal = terminal;
-                                    document.getElementById('selected-terminal').textContent = terminal.name;
-                                    document.getElementById('terminal-image').src = terminal.image;
-                                    Swal.fire({
-                                        title: 'Select Destination',
-                                        text: 'Click anywhere on the map to set your destination.',
-                                        icon: 'info'
-                                    });
-                                    enableDestinationSelection();
-                                }
-                            });
-                        });
+                        .on('click', () => selectTerminal(terminal));
                 });
             } else {
                 console.error("Failed to load terminals:", result);
@@ -383,177 +342,183 @@ document.addEventListener("DOMContentLoaded", function() {
         })
         .catch(err => console.error("Error fetching terminals:", err));
 
-    function enableDestinationSelection() {
-        map.once('click', async function(e) {
-            if (destinationMarker) {
-                map.removeLayer(destinationMarker);
-            }
-            selectedDestination = {
-                lat: e.latlng.lat,
-                lng: e.latlng.lng
-            };
-            destinationMarker = L.marker([selectedDestination.lat, selectedDestination.lng])
-                .addTo(map)
-                .bindPopup("Destination")
-                .openPopup();
-
-            // Reverse geocode
-            try {
-                const url = `reverse-geocode.php?lat=${selectedDestination.lat}&lon=${selectedDestination.lng}`;
-                const response = await fetch(url);
-                const data = await response.json();
-                let address = '';
-                if (data && data.address) {
-                    address = [
-                        data.address.suburb || data.address.village || data.address.hamlet || data.address.neighbourhood || '',
-                        data.address.road || '',
-                        data.address.city || data.address.town || data.address.municipality || '',
-                        data.address.state || '',
-                        data.address.country || ''
-                    ].filter(Boolean).join(', ');
-                }
-                if (!address) {
-                    address = data.display_name || '';
-                }
-                document.getElementById('selected-destination').textContent = address ? address : (selectedDestination.lat.toFixed(5) + ", " + selectedDestination.lng.toFixed(5));
-            } catch (err) {
-                document.getElementById('selected-destination').textContent = selectedDestination.lat.toFixed(5) + ", " + selectedDestination.lng.toFixed(5);
-            }
-
-            routeAndCalculate();
-        });
+    // Start geolocation fallback (browser)
+    if (navigator.geolocation) {
+        console.log("🌍 Browser geolocation active");
+        navigator.geolocation.watchPosition(function (position) {
+            updateLocation(position.coords.latitude, position.coords.longitude);
+        }, err => console.warn("Browser geolocation error:", err));
+    } else {
+        console.warn("No geolocation support detected.");
     }
+});
 
-    // Routing and calculation
-    function routeAndCalculate() {
-        if (!selectedTerminal || !selectedDestination) return;
-        if (routingControl) {
-            map.removeControl(routingControl);
-        }
-        routingControl = L.Routing.control({
-            waypoints: [
-                L.latLng(selectedTerminal.latitude, selectedTerminal.longitude),
-                L.latLng(selectedDestination.lat, selectedDestination.lng)
-            ],
-            routeWhileDragging: false,
-            show: false,
-            addWaypoints: false,
-            draggableWaypoints: false,
-            fitSelectedRoutes: true,
-            lineOptions: { styles: [{ color: 'blue', weight: 5 }] },
-            router: new L.Routing.OSRMv1({
-                serviceUrl: 'https://router.project-osrm.org/route/v1',
-                profile: 'driving',
-                alternatives: true
+// ✅ Function called by the MIT App (EvaluateJavaScript)
+function updateLocation(lat, lng) {
+    console.log("📍 Received location:", lat, lng);
+
+    if (!map) return;
+
+    if (!userMarker) {
+        userMarker = L.marker([lat, lng], {
+            icon: L.icon({
+                iconUrl: "https://cdn-icons-png.flaticon.com/512/64/64113.png",
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
             })
-        }).addTo(map);
-
-        routingControl.on('routesfound', function(e) {
-            if (window.altPolylines) {
-                window.altPolylines.forEach(pl => map.removeLayer(pl));
-            }
-            window.altPolylines = [];
-            window.activeRoute = null;
-
-            e.routes.forEach((route, idx) => {
-                var color = idx === 0 ? 'blue' : '#888';
-                var polyline = L.polyline(route.coordinates, {
-                    color: color,
-                    weight: 5,
-                    opacity: idx === 0 ? 1 : 0.7
-                }).addTo(map);
-
-                window.altPolylines.push(polyline);
-
-                if (idx === 0) {
-                    window.activeRoute = polyline;
-                    updateInfo(route);
-                }
-
-                polyline.on('click', function() {
-                    window.altPolylines.forEach(pl => pl.setStyle({ color: '#888', opacity: 0.7 }));
-                    polyline.setStyle({ color: 'blue', opacity: 1 });
-                    window.activeRoute = polyline;
-                    updateInfo(route);
-                });
-            });
-        });
+        })
+            .addTo(map)
+            .bindTooltip("You are here", {
+                permanent: true,
+                direction: "top",
+                offset: [0, -10]
+            })
+            .openTooltip();
+    } else {
+        userMarker.setLatLng([lat, lng]);
     }
 
-    // Update Info Panel (Fare, Distance, ETA)
-    function updateInfo(route) {
-        var distanceKm = route.summary.totalDistance / 1000;
-        var roundedKm = Math.ceil(distanceKm);
-
-        var base = parseFloat(selectedTerminal.base_rate || 11); // default 11 kung walang DB value
-        var perKm = parseFloat(selectedTerminal.per_km_rate || 1); // default 1 per km
-
-        var fare = base + (roundedKm * perKm);
-        var eta = Math.ceil(route.summary.totalTime / 60);
-
-        document.getElementById('distance').textContent = roundedKm + "";
-        document.getElementById('fare').textContent = fare.toFixed(2);
-        document.getElementById('eta').textContent = eta + "";
+    if (firstUpdate) {
+        map.setView([lat, lng], 15);
+        firstUpdate = false;
     }
+}
 
-    // Clear button
-    document.getElementById('clear-btn').addEventListener('click', function() {
-        selectedTerminal = null;
-        selectedDestination = null;
-        document.getElementById('selected-terminal').textContent = 'None';
-        document.getElementById('terminal-image').src = '';
-        document.getElementById('selected-destination').textContent = 'None';
-        document.getElementById('distance').textContent = '-';
-        document.getElementById('fare').textContent = '-';
-        document.getElementById('eta').textContent = '-';
-
-        if (routingControl) {
-            map.removeControl(routingControl);
-            routingControl = null;
+// ✅ Select Terminal logic
+function selectTerminal(terminal) {
+    Swal.fire({
+        title: terminal.name,
+        html: `
+            <img src="${terminal.image}" alt="Terminal Image" style="max-width:300px;display:block;margin:10px auto;">
+            <button id="view-360-btn" style="background:#4285F4;color:#fff;border:none;border-radius:6px;padding:8px 16px;margin:10px auto;display:block;cursor:pointer;">
+                <i class="fa fa-street-view"></i> View 360
+            </button>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Select',
+        cancelButtonText: 'Cancel',
+        icon: 'info',
+        didOpen: () => {
+            document.getElementById('view-360-btn').onclick = () => {
+                const lat = terminal.latitude;
+                const lng = terminal.longitude;
+                const url = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+                window.open(url, '_blank');
+            };
         }
-        if (window.altPolylines) {
-            window.altPolylines.forEach(pl => map.removeLayer(pl));
-            window.altPolylines = [];
-        }
-        window.activeRoute = null;
-
-        if (destinationMarker) {
-            map.removeLayer(destinationMarker);
-            destinationMarker = null;
+    }).then(result => {
+        if (result.isConfirmed) {
+            selectedTerminal = terminal;
+            document.getElementById('selected-terminal').textContent = terminal.name;
+            document.getElementById('terminal-image').src = terminal.image;
+            Swal.fire('Select Destination', 'Click anywhere on the map to set your destination.', 'info');
+            enableDestinationSelection();
         }
     });
+}
 
-    // User Location Tracker
-    if (navigator.geolocation) {
-        navigator.geolocation.watchPosition(function(position) {
-            var lat = position.coords.latitude;
-            var lng = position.coords.longitude;
+// ✅ Destination selection
+function enableDestinationSelection() {
+    map.once('click', async function (e) {
+        if (destinationMarker) map.removeLayer(destinationMarker);
+        selectedDestination = { lat: e.latlng.lat, lng: e.latlng.lng };
+        destinationMarker = L.marker([selectedDestination.lat, selectedDestination.lng])
+            .addTo(map)
+            .bindPopup("Destination")
+            .openPopup();
 
-            if (!userMarker) {
-                userMarker = L.marker([lat, lng], {
-                    icon: L.icon({
-                        iconUrl: "https://cdn-icons-png.flaticon.com/512/64/64113.png",
-                        iconSize: [20, 20],
-                        iconAnchor: [10, 10]
-                    })
-                })
-                .addTo(map)
-                .bindTooltip("You are here", {
-                    permanent: true,
-                    direction: "top",
-                    offset: [0, -10]
-                })
-                .openTooltip();
-            } else {
-                userMarker.setLatLng([lat, lng]);
+        try {
+            const url = `reverse-geocode.php?lat=${selectedDestination.lat}&lon=${selectedDestination.lng}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            let address = '';
+            if (data && data.address) {
+                address = [
+                    data.address.suburb || data.address.village || '',
+                    data.address.road || '',
+                    data.address.city || data.address.town || '',
+                    data.address.state || '',
+                    data.address.country || ''
+                ].filter(Boolean).join(', ');
             }
+            if (!address) address = data.display_name || '';
+            document.getElementById('selected-destination').textContent = address || `${selectedDestination.lat.toFixed(5)}, ${selectedDestination.lng.toFixed(5)}`;
+        } catch {
+            document.getElementById('selected-destination').textContent =
+                `${selectedDestination.lat.toFixed(5)}, ${selectedDestination.lng.toFixed(5)}`;
+        }
 
-            if (firstUpdate) {
-                map.setView([lat, lng], 15);
-                firstUpdate = false;
-            }
+        routeAndCalculate();
+    });
+}
+
+// ✅ Routing & Calculation
+function routeAndCalculate() {
+    if (!selectedTerminal || !selectedDestination) return;
+    if (routingControl) map.removeControl(routingControl);
+
+    routingControl = L.Routing.control({
+        waypoints: [
+            L.latLng(selectedTerminal.latitude, selectedTerminal.longitude),
+            L.latLng(selectedDestination.lat, selectedDestination.lng)
+        ],
+        routeWhileDragging: false,
+        addWaypoints: false,
+        draggableWaypoints: false,
+        fitSelectedRoutes: true,
+        lineOptions: { styles: [{ color: 'blue', weight: 5 }] },
+        router: new L.Routing.OSRMv1({
+            serviceUrl: 'https://router.project-osrm.org/route/v1',
+            profile: 'driving',
+            alternatives: true
+        })
+    }).addTo(map);
+
+    routingControl.on('routesfound', e => {
+        if (window.altPolylines) window.altPolylines.forEach(pl => map.removeLayer(pl));
+        window.altPolylines = [];
+        e.routes.forEach((route, idx) => {
+            const color = idx === 0 ? 'blue' : '#888';
+            const poly = L.polyline(route.coordinates, {
+                color, weight: 5, opacity: idx === 0 ? 1 : 0.7
+            }).addTo(map);
+            window.altPolylines.push(poly);
+            if (idx === 0) updateInfo(route);
+            poly.on('click', () => {
+                window.altPolylines.forEach(pl => pl.setStyle({ color: '#888', opacity: 0.7 }));
+                poly.setStyle({ color: 'blue', opacity: 1 });
+                updateInfo(route);
+            });
         });
-    }
+    });
+}
+
+// ✅ Update info (distance, fare, ETA)
+function updateInfo(route) {
+    const distanceKm = Math.ceil(route.summary.totalDistance / 1000);
+    const base = parseFloat(selectedTerminal.base_rate || 11);
+    const perKm = parseFloat(selectedTerminal.per_km_rate || 1);
+    const fare = base + (distanceKm * perKm);
+    const eta = Math.ceil(route.summary.totalTime / 60);
+
+    document.getElementById('distance').textContent = distanceKm;
+    document.getElementById('fare').textContent = fare.toFixed(2);
+    document.getElementById('eta').textContent = eta;
+}
+
+// ✅ Clear button
+document.getElementById('clear-btn').addEventListener('click', function () {
+    selectedTerminal = null;
+    selectedDestination = null;
+    document.getElementById('selected-terminal').textContent = 'None';
+    document.getElementById('terminal-image').src = '';
+    document.getElementById('selected-destination').textContent = 'None';
+    document.getElementById('distance').textContent = '-';
+    document.getElementById('fare').textContent = '-';
+    document.getElementById('eta').textContent = '-';
+    if (routingControl) map.removeControl(routingControl);
+    if (window.altPolylines) window.altPolylines.forEach(pl => map.removeLayer(pl));
+    if (destinationMarker) map.removeLayer(destinationMarker);
 });
 </script>
 
